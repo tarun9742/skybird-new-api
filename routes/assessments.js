@@ -1,0 +1,22 @@
+const express = require('express');
+const router = express.Router();
+const { protectCustomer, protectAdmin } = require('../middleware/auth');
+const ctrl = require('../controllers/assessmentController');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+const dir = path.join(process.env.PRIVATE_ASSESSMENT_PATH || path.join(__dirname, '../private-assessments'));
+fs.mkdirSync(dir, { recursive: true });
+const storage = multer.diskStorage({ destination: (_req, _file, cb) => cb(null, dir), filename: (_req, file, cb) => cb(null, `${require('crypto').randomUUID()}${path.extname(file.originalname).toLowerCase()}`) });
+const upload = multer({ storage, limits: { fileSize: 100 * 1024 * 1024 }, fileFilter: (_req, file, cb) => {
+  const ext = path.extname(file.originalname).toLowerCase();
+  const ok = (ext === '.pdf' && file.mimetype === 'application/pdf') || ((ext === '.zip' || ext === '.7z') && ['application/zip','application/x-zip-compressed','application/x-7z-compressed','application/octet-stream'].includes(file.mimetype));
+  cb(ok ? null : new Error('Only PDF or ZIP/7Z folder archives are allowed'), ok);
+} });
+router.get('/admin/students', protectAdmin, ctrl.students);
+router.get('/admin', protectAdmin, ctrl.listAdmin);
+router.post('/admin', protectAdmin, upload.single('file'), ctrl.create);
+router.delete('/admin/:id', protectAdmin, ctrl.remove);
+router.get('/mine', protectCustomer, ctrl.listMine);
+router.get('/download/:id', protectCustomer, ctrl.download);
+module.exports = router;
